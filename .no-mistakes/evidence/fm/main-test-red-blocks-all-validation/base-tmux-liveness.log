@@ -1,0 +1,3 @@
+ok - tmux liveness: a harness-named foreground process classifies alive
+last verdict for liveness:muse was missing (expected alive); title=sh comms=[sh ]
+not ok - muse's version-suffixed binary name must classify alive
