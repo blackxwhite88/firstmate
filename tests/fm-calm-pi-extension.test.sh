@@ -98,16 +98,25 @@ render_export_dom() {
   : >"$report"
   for attempt in 1 2 3; do
     log="$TMP_ROOT/chrome-render-$attempt.err"
-    profile="$TMP_ROOT/chrome-profile-$attempt"
+    profile="$TMP_ROOT/chrome-home-$attempt"
     rm -rf "$profile"
+    mkdir -p "$profile"
     : >"$out_file"
-    "$chrome" \
+    # Give Chrome a private HOME rather than an explicit --user-data-dir. An
+    # --user-data-dir pointing at a brand-new profile makes Chrome's first-run
+    # initialization never complete on at least Google Chrome for Testing
+    # 151.0.7922.34: the browser and its renderers start, but --dump-dom never
+    # returns, so all three bounded attempts end exit=0 timed_out=yes bytes=0 and
+    # the DOM assertions below never run at all. Chrome's own profile creation
+    # under a fresh HOME renders the same document in about a second, and every
+    # attempt still gets a private profile because the HOME is removed first.
+    HOME="$profile" XDG_CONFIG_HOME="$profile/.config" XDG_CACHE_HOME="$profile/.cache" \
+      "$chrome" \
       --headless=new \
       --disable-gpu \
       --no-sandbox \
       --disable-dev-shm-usage \
       --disable-background-networking \
-      --user-data-dir="$profile" \
       --virtual-time-budget=2000 \
       --dump-dom \
       "file://$source_file" >"$out_file" 2>"$log" &
