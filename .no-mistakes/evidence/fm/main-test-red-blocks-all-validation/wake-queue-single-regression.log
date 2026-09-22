@@ -1,0 +1,15 @@
+=== BASE (da9607d) isolated foreign-queue stall test, 3 runs ===
+not ok - a foreign queue with no progress did not alert: check: rearm-resurface
+base run 1 exit=1
+not ok - a foreign queue with no progress did not alert: check: rearm-resurface
+base run 2 exit=1
+not ok - a foreign queue with no progress did not alert: check: rearm-resurface
+base run 3 exit=1
+
+=== TARGET (7372c8d) isolated foreign-queue stall test, 3 runs ===
+ok - foreign secondmate queue alerts once per no-progress episode without age-only or cascade noise
+target run 1 exit=0
+ok - foreign secondmate queue alerts once per no-progress episode without age-only or cascade noise
+target run 2 exit=0
+ok - foreign secondmate queue alerts once per no-progress episode without age-only or cascade noise
+target run 3 exit=0

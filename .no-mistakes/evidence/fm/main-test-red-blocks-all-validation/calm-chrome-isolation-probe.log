@@ -1,0 +1,15 @@
+# Linux profile isolation probe for the changed render_export_dom invocation
+# (target commit 7372c8d). Real Chrome for Testing 151.0.7922.34, run with the
+# same env/flags the test now uses on non-Darwin: private HOME + XDG dirs and
+# NO --user-data-dir.
+
+$ HOME=/tmp/fm-chrome-iso/home2 XDG_CONFIG_HOME=$HOME/.config XDG_CACHE_HOME=$HOME/.cache \
+    google-chrome --headless=new --disable-gpu --no-sandbox --disable-dev-shm-usage \
+    --disable-background-networking --virtual-time-budget=2000 --dump-dom file:///tmp/fm-chrome-iso/src.html
+exit=0
+dom bytes: 50  (contains the probe marker)
+private HOME profile dirs created:
+  <privateHOME>/.config/google-chrome-for-testing
+  <privateHOME>/.cache/google-chrome-for-testing-headless
+operator real profile ~/.config/google-chrome:
+  files modified within 120s of the render: (none)

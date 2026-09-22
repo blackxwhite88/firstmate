@@ -1,0 +1,1 @@
+skip: no long-running stand-in binary survives a rename (multicall coreutils, no C compiler)
