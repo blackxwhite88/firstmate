@@ -1,0 +1,14 @@
+chrome=/home/local/.local/bin/google-chrome version=Google Chrome for Testing 151.0.7922.34 
+source=/tmp/fm-chrome-src.QT8WWp.html
+
+### OLD behavior: fresh explicit --user-data-dir (the pre-fix invocation)
+exit=124 elapsed=20s bytes=0 has_html_close=0
+
+### NEW behavior: private HOME/XDG, no --user-data-dir (the fix)
+exit=0 elapsed=2s bytes=77 has_html_close=1
+rendered-ok
+
+### NEW behavior DOM head:
+<html><head></head><body><div id="messages">rendered-ok</div>
+</body></html>
+

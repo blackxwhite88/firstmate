@@ -1,0 +1,3 @@
+wait_for_exit: owned pid 1457517 exceeded 40 polls; sending TERM
+1457517 1457400 S    bash /home/local/.no-mistakes/worktrees/b39db14c8322/01M36FX1PV020BTT3Z9RZAABGZ/bin/fm-watch.sh
+not ok - watcher did not exit for first signal

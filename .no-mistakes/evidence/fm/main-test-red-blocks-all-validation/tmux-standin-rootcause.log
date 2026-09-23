@@ -1,0 +1,13 @@
+sleep=/usr/bin/sleep -> /usr/lib/cargo/bin/coreutils/sleep
+sleep version: sleep (uutils coreutils) 0.8.0
+
+### host sleep invoked through a harness-named symlink (the pre-fix stand-in)
+ALIVE after 0.3s: no (exited rc=1)
+stderr: error: 2 values required for '<FILES> <FILES>' but 1 was provided
+
+Usage: link FILE1 FILE2
+
+For more information, try '--help'.
+
+### compiled stand-in invoked through the same harness-named symlink (the fix)
+ALIVE after 0.3s: yes

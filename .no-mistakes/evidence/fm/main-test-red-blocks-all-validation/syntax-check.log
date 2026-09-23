@@ -1,0 +1,3 @@
+bash -n OK: tests/fm-tmux-agent-liveness.test.sh
+bash -n OK: tests/fm-calm-pi-extension.test.sh
+bash -n OK: tests/fm-wake-queue.test.sh
