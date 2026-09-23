@@ -1,0 +1,49 @@
+warning: You appear to have cloned an empty repository.
+firstmate:fm-task-x1
+firstmate:fm-task-x10
+=== target: wake rows seeded (queue before teardown) ===
+stale: firstmate:fm-task-x1,firstmate:fm-task-x10
+
+signal: task-x1.status,task-x1.turn-ended,task-x10.status,task-y2.turn-ended
+
+check: /tmp/fm-wake-prune-live.g0tMEz/state/task-x1.check.sh,/tmp/fm-wake-prune-live.g0tMEz/state/task-x10.check.sh
+
+heartbeat: heartbeat
+
+--- running target teardown (ff38736) ---
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 3s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair a missing or failed watcher cycle with the Pi tool fm_watch_arm_pi, or restart Pi with -e /home/local/.no-mistakes/worktrees/b39db14c8322/01M36K50TAANJC3SS035Y334JX/.pi/extensions/fm-primary-turnend-guard.ts -e /home/local/.no-mistakes/worktrees/b39db14c8322/01M36K50TAANJC3SS035Y334JX/.pi/extensions/fm-primary-pi-watch.ts if the extensions are not loaded.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+teardown task-x1 complete (window firstmate:fm-task-x1, worktree /tmp/fm-wake-prune-live.g0tMEz/wt)
+Backlog: task-x1 just finished (this home keeps no markdown backlog at /tmp/fm-wake-prune-live.g0tMEz/data/backlog.md). Update /tmp/fm-wake-prune-live.g0tMEz/data/backlog.md - move task-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+teardown rc=0
+--- teardown stdout/stderr tail ---
+=== target: wake rows after teardown ===
+stale: firstmate:fm-task-x10
+
+signal: task-x10.status,task-y2.turn-ended
+
+check: /tmp/fm-wake-prune-live.g0tMEz/state/task-x10.check.sh
+
+heartbeat: heartbeat
+
+--- issue #3419 bookkeeping markers after teardown (out of this change's scope) ---
+PRESENT: .seen-task-x1_turn-ended
+ABSENT: .seen-task-x1_status
+ASSERT OK: retired task's stale window wake pruned
+ASSERT OK: retired task's status signal wake pruned
+ASSERT OK: retired task's turn-ended signal wake pruned
+ASSERT OK: retired task's check wake pruned
+ASSERT OK: sibling task-x10 stale wake preserved (prefix collision)
+ASSERT OK: sibling task-x10 status wake preserved (prefix collision)
+ASSERT OK: sibling task-x10 check wake preserved (prefix collision)
+ASSERT OK: unrelated task-y2 signal wake preserved
+ASSERT OK: heartbeat row preserved
+ASSERT OK: malformed short row preserved
+ASSERT OK: .wake-queue is a regular file
+LIVE SCENARIO PASS
