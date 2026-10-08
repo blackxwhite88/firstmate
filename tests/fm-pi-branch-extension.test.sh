@@ -3047,31 +3047,51 @@ EOF
 }
 
 test_stalled_branch_retires_grants_and_queued_work() {
-  local repo home out status selection
+  local repo home out status selection input
   for selection in after-timeout model effort command; do
-  repo="$TMP_ROOT/stalled-branch-$selection-root"
-  home="$TMP_ROOT/stalled-branch-$selection-home"
+  for input in delivered pending; do
+  repo="$TMP_ROOT/stalled-branch-$selection-$input-root"
+  home="$TMP_ROOT/stalled-branch-$selection-$input-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
   PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_TEST_SELECTION_TIMING="$selection" FM_BRANCH_DELIVERY_TIMEOUT_MS=5000 DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+    FM_TEST_MIRROR_INPUT="$input" FM_TEST_SELECTION_TIMING="$selection" FM_BRANCH_DELIVERY_TIMEOUT_MS=5000 DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, settle, home, realRoot, defaultSessionCtx, makeCtx, commands, registryModels, uiSelections, setMainThinkingLevel }; })()`);
-const { dispatch, fire, settle, home, realRoot, defaultSessionCtx, makeCtx, commands, registryModels, uiSelections, setMainThinkingLevel } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, settle, home, realRoot, defaultSessionCtx, makeCtx, commands, registryModels, uiSelections, setMainThinkingLevel, mainEntries }; })()`);
+const { dispatch, fire, settle, home, realRoot, defaultSessionCtx, makeCtx, commands, registryModels, uiSelections, setMainThinkingLevel, mainEntries } = globalThis.__t;
 const selection = process.env.FM_TEST_SELECTION_TIMING;
 registryModels.push(
   { provider: "anthropic", id: "main-model", reasoning: true },
   { provider: "anthropic", id: "replacement-model", reasoning: true },
 );
 await fire("session_start", {}, defaultSessionCtx);
+mainEntries.push(
+  { type: "message", message: { role: "user", content: "captain baseline context before the stalled probe" } },
+  { type: "message", message: { role: "assistant", content: "primary baseline response before the stalled probe" } },
+);
+const stagedText = "captain staged input before the stalled probe";
+await fire("before_agent_start", { prompt: stagedText }, defaultSessionCtx);
 let finishPrompt;
 globalThis.__fmOnBranchPrompt = () => new Promise((resolve) => { finishPrompt = resolve; });
 const first = dispatch("signal: stalled read-only probe");
 const firstFailure = first.settlement.then(() => null, (error) => error);
 await settle(() => typeof finishPrompt === "function", "stalled branch prompt");
 const staleSession = globalThis.__fmSessions[0];
+const mirrorTexts = (session) => session.ops.filter((op) => op.kind === "custom" && op.message.customType === "fm-main-mirror").map((op) => op.message.content);
+for (const text of ["[captain] captain baseline context before the stalled probe", "[main] primary baseline response before the stalled probe", `[captain] ${stagedText}`]) {
+  if (!mirrorTexts(staleSession).includes(text)) throw new Error(`stalled branch missed initial context: ${text}`);
+}
+const pendingText = "captain pending input while the probe is stalled";
+if (process.env.FM_TEST_MIRROR_INPUT === "pending") {
+  mainEntries.push(
+    { type: "message", message: { role: "user", content: stagedText } },
+    { type: "message", message: { role: "assistant", content: "primary pending response while the probe is stalled" } },
+  );
+  await fire("turn_end", {}, defaultSessionCtx);
+  await fire("before_agent_start", { prompt: pendingText }, defaultSessionCtx);
+}
 const queued = dispatch("signal: queued behind stalled probe");
 const queuedFailure = queued.settlement.then(() => null, (error) => error);
 if (!first.accepted || !queued.accepted) throw new Error("live branch did not accept wakes");
@@ -3133,6 +3153,24 @@ if (!recovered.accepted) throw new Error("selection change could not recover the
 await recovered.settlement;
 if (globalThis.__fmSessions.length !== 2) throw new Error("replacement session was not constructed");
 const replacement = globalThis.__fmSessions[1];
+if (replacement.options.sessionManager.getSessionFile() === staleSession.options.sessionManager.getSessionFile()) {
+  throw new Error("timeout recovery reopened the retired conversation");
+}
+const expectedMirror = [
+  "[captain] captain baseline context before the stalled probe",
+  "[main] primary baseline response before the stalled probe",
+  `[captain] ${stagedText}`,
+];
+if (process.env.FM_TEST_MIRROR_INPUT === "pending") {
+  expectedMirror.push("[main] primary pending response while the probe is stalled", `[captain] ${pendingText}`);
+}
+const replacementMirror = mirrorTexts(replacement);
+let previousIndex = -1;
+for (const text of expectedMirror) {
+  const index = replacementMirror.indexOf(text);
+  if (index <= previousIndex) throw new Error(`replacement branch lost or reordered context: ${text}`);
+  previousIndex = index;
+}
 if (selection !== "effort" && replacement.options.model?.id !== "replacement-model") {
   throw new Error("replacement did not use the corrected model");
 }
@@ -3145,8 +3183,9 @@ process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "stalled branch must retire ownership and preserve $selection recovery: $out"
-  pass "stalled branch retires ownership and preserves $selection recovery"
+  expect_code 0 "$status" "stalled branch must preserve $selection recovery and $input dialog: $out"
+  pass "stalled branch preserves $selection recovery and $input dialog"
+  done
   done
 }
 

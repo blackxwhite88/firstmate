@@ -1577,6 +1577,11 @@ ${context.command}
           if (error === timeoutError) {
             if (acceptedGeneration === generation) {
               generation += 1;
+              mirrorCollection.reanchor = true;
+              const staged = mirrorCollection.stagedCaptain;
+              if (staged && !pendingMirror.some((item) => item.tag === "captain" && item.text === staged.text)) {
+                pendingMirror.push({ tag: "captain", text: staged.text });
+              }
               if (branchForWake.selectionRevision === branchSelectionRevision) {
                 branchBroken = timeoutError.message;
                 providerRecovery = null;
@@ -1648,7 +1653,10 @@ ${context.command}
   function collectCurrentMainDialog(): boolean {
     if (!currentMainSession) return true;
     try {
-      pendingMirror.push(...collectMainDialog(currentMainSession, mirrorCollection));
+      const reanchor = mirrorCollection.reanchor;
+      const items = collectMainDialog(currentMainSession, mirrorCollection);
+      if (reanchor) pendingMirror.unshift(...items);
+      else pendingMirror.push(...items);
       return true;
     } catch {
       return false;
