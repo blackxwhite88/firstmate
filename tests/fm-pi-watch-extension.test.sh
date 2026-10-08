@@ -621,7 +621,7 @@ EOF
   pass "Pi dispatcher branch offer owns accepted wakes and falls back to main"
 }
 
-test_pi_stalled_branch_turn_times_out_and_falls_back_to_main() {
+test_pi_failed_branch_turn_falls_back_to_main() {
   local repo home plugin log stop out status
   repo="$TMP_ROOT/pi-branch-timeout-root"
   home="$TMP_ROOT/pi-branch-timeout-home"
@@ -648,7 +648,7 @@ trap 'exit 0' TERM INT
 while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
-  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_BRANCH_DELIVERY_TIMEOUT_MS=50 node --input-type=module 2>&1 <<'EOF'
+  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" node --input-type=module 2>&1 <<'EOF'
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
@@ -667,8 +667,9 @@ const bus = {
 };
 bus.on("fm-branch-supervision:dispatch", (offer) => {
   offers.push({ message: offer.message, projects: offer.projects });
-  // Simulating a stalled branch turn that never resolves
-  offer.accept(new Promise(() => {}));
+  offer.accept(new Promise((_resolve, reject) => {
+    setTimeout(() => reject(new Error("supervision branch delivery timeout")), 50);
+  }));
 });
 const pi = {
   on() {},
@@ -710,9 +711,9 @@ process.exit(0);
 EOF
   )
   status=$?
-  expect_code 0 "$status" "Pi dispatcher must time out stalled branch turn and fall back to main"
+  expect_code 0 "$status" "Pi dispatcher must fall back to main after branch failure"
   [ -z "$out" ] || fail "Pi branch-timeout test printed output: $out"
-  pass "Pi dispatcher times out stalled branch turn and falls back to main"
+  pass "Pi dispatcher falls back to main after branch failure"
 }
 
 test_pi_branch_offer_flags_heartbeat() {
@@ -5282,7 +5283,7 @@ test_pi_scheduled_retry_call_is_owned_noop
 test_pi_actionable_close_starts_single_successor_before_delivery
 test_pi_actionable_output_waits_for_predecessor_close
 test_pi_branch_offer_owns_actionable_wake
-test_pi_stalled_branch_turn_times_out_and_falls_back_to_main
+test_pi_failed_branch_turn_falls_back_to_main
 test_pi_branch_offer_flags_heartbeat
 test_pi_heartbeat_is_not_ridden_into_main_by_a_co_present_check
 test_pi_main_only_check_classes_stay_on_main

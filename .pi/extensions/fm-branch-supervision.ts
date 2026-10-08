@@ -155,7 +155,11 @@ const effortPinFile = join(config, "supervision-branch-effort");
 // Same tool set in the same order on every request (part of the cached
 // prefix). "bash" resolves to the customTools override below, which injects
 // the branch actor identity deterministically into every shell command.
-const BRANCH_TOOL_NAMES = ["read", "bash", "fm_branch_report"] as const;
+const BRANCH_TOOL_NAMES = ["read", "bash", "fm_branch_report", "antigravity"] as const;
+const configuredBranchTimeout = Number(process.env.FM_BRANCH_DELIVERY_TIMEOUT_MS);
+const branchDeliveryTimeoutMs = Number.isSafeInteger(configuredBranchTimeout) && configuredBranchTimeout > 0
+  ? configuredBranchTimeout
+  : 120000;
 
 // One shared prompt_cache_key per home for ALL branch sessions, derived only
 // from the home path so it survives restarts; main keeps its own session key.
@@ -1560,9 +1564,31 @@ ${context.command}
         // lets this prompt proceed; the guarded scripts revalidate, and the
         // durable queue keeps every row (bin/fm-lease-lib.sh role-partition).
         const postureTail = afk ? await awayPostureTail() : "";
+        let promptTimer: ReturnType<typeof setTimeout> | undefined;
+        const timeoutError = new Error("supervision branch delivery timeout");
         try {
-          await session.prompt(branchWakePrompt(message, "fm_branch_report", postureTail));
+          await Promise.race([
+            session.prompt(branchWakePrompt(message, "fm_branch_report", postureTail)),
+            new Promise<never>((_resolve, reject) => {
+              promptTimer = setTimeout(() => reject(timeoutError), branchDeliveryTimeoutMs);
+            }),
+          ]);
+        } catch (error) {
+          if (error === timeoutError) {
+            if (acceptedGeneration === generation) {
+              generation += 1;
+              branchBroken = timeoutError.message;
+              providerRecovery = null;
+            }
+            if (branch === branchForWake) branch = null;
+            try {
+              session.dispose();
+            } catch {}
+            await deactivateEligibleRowsOwner(state, wakeGrantScript, process.pid, String(acceptedGeneration));
+          }
+          throw error;
         } finally {
+          if (promptTimer) clearTimeout(promptTimer);
           wakeTaskScope = null;
         }
         const providerError = settledPromptProviderError(sessionManager, entryOffset);

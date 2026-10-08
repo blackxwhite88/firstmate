@@ -218,6 +218,7 @@ export async function createAgentSession(options) {
   for (const message of branchMessages) options.sessionManager.getEntries().push({ type: "message", message });
   const session = {
     options,
+    activeCustomTools: options.customTools.filter((tool) => options.tools.includes(tool.name)),
     ops: [],
     get messages() {
       return branchMessages;
@@ -691,8 +692,14 @@ if (mainUserMessages.length !== 0) throw new Error("accepted wake leaked to main
 // generator-produced system prompt, no project resources, and the branch bash
 // carries the deterministic actor identity.
 const session = globalThis.__fmSessions[0];
-if (JSON.stringify(session.options.tools) !== JSON.stringify(["read", "bash", "fm_branch_report"])) {
+if (JSON.stringify(session.options.tools) !== JSON.stringify(["read", "bash", "fm_branch_report", "antigravity"])) {
   throw new Error(`unexpected tool order: ${JSON.stringify(session.options.tools)}`);
+}
+const compatibilityTool = session.activeCustomTools.find((tool) => tool.name === "antigravity");
+if (!compatibilityTool) throw new Error("compatibility tool is not permitted by the branch loadout");
+const compatibilityResult = await compatibilityTool.execute("compatibility-call", { probe: true });
+if (compatibilityResult.isError || compatibilityResult.content[0]?.text !== "ok") {
+  throw new Error(`compatibility tool did not execute: ${JSON.stringify(compatibilityResult)}`);
 }
 const loader = globalThis.__fmLoaders[0];
 for (const key of ["noExtensions", "noSkills", "noPromptTemplates", "noThemes", "noContextFiles"]) {
@@ -3037,6 +3044,80 @@ EOF
   out=$(cat "$TMP_ROOT/node-output")
   expect_code 0 "$status" "selection changes must preserve in-flight transcript and isolate provider streaks: $out"
   pass "selection changes preserve in-flight transcript ownership and reset provider-error streaks"
+}
+
+test_stalled_branch_retires_grants_and_queued_work() {
+  local repo home out status
+  repo="$TMP_ROOT/stalled-branch-root"
+  home="$TMP_ROOT/stalled-branch-home"
+  mkdir -p "$home/state" "$home/config"
+  install_pi_branch_extension_fixture "$repo"
+  PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
+    FM_BRANCH_DELIVERY_TIMEOUT_MS=5000 DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+import { existsSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+const prelude = process.env.DRIVER_PRELUDE;
+await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, settle, home, realRoot, defaultSessionCtx }; })()`);
+const { dispatch, fire, settle, home, realRoot, defaultSessionCtx } = globalThis.__t;
+await fire("session_start", {}, defaultSessionCtx);
+let finishPrompt;
+globalThis.__fmOnBranchPrompt = () => new Promise((resolve) => { finishPrompt = resolve; });
+const first = dispatch("signal: stalled read-only probe");
+const firstFailure = first.settlement.then(() => null, (error) => error);
+await settle(() => typeof finishPrompt === "function", "stalled branch prompt");
+const staleSession = globalThis.__fmSessions[0];
+const queued = dispatch("signal: queued behind stalled probe");
+const queuedFailure = queued.settlement.then(() => null, (error) => error);
+if (!first.accepted || !queued.accepted) throw new Error("live branch did not accept wakes");
+if (!existsSync(`${home}/state/.branch-eligible-rows`)) throw new Error("stalled prompt has no real row grant");
+const drain = (...args) => spawnSync("bash", [`${realRoot}/bin/fm-wake-drain.sh`, ...args], {
+  encoding: "utf8", env: { ...process.env, FM_HOME: home, FM_STATE_OVERRIDE: `${home}/state`, FM_SUPERVISION_ACTOR: "main" },
+});
+const blocked = drain();
+if (blocked.status !== 0 || blocked.stdout.includes("branch-driver.status")) {
+  throw new Error(`main must not drain a live branch grant: ${blocked.stderr} ${blocked.stdout}`);
+}
+const error = await firstFailure;
+if (!error?.message.includes("delivery timeout")) throw new Error(`stalled prompt did not reject: ${error}`);
+if (!staleSession.disposed) throw new Error("stalled session was not disposed");
+if (existsSync(`${home}/state/.branch-eligible-rows`)) throw new Error("stalled prompt retained row ownership");
+if (!(await queuedFailure)?.message.includes("replaced")) throw new Error("queued work remained stuck or ran after retirement");
+const declined = dispatch("signal: after stalled probe");
+if (declined.accepted) throw new Error("later offer joined the retired branch");
+const resumed = drain();
+if (resumed.status !== 0 || !resumed.stdout.includes("branch-driver.status")) {
+  throw new Error(`main could not drain released row: ${resumed.stderr} ${resumed.stdout}`);
+}
+const report = staleSession.activeCustomTools.find((tool) => tool.name === "fm_branch_report");
+const lateReport = await report.execute("late", { task: "branch-driver", verdict: "routine", summary: "late result" });
+if (!lateReport.isError) throw new Error("retired branch recorded a late report");
+const bash = staleSession.activeCustomTools.find((tool) => tool.name === "bash");
+let refused = false;
+try { bash.__options.spawnHook({ command: "true", env: {} }); } catch { refused = true; }
+if (!refused) throw new Error("retired branch launched a late shell");
+const recoveryGeneration = resumed.stderr.match(/--recovery-generation (\S+)/)?.[1];
+if (!recoveryGeneration) throw new Error(`main drain omitted its acknowledgement generation: ${resumed.stderr}`);
+const acknowledged = drain("--ack-through", "1", "--recovery-generation", recoveryGeneration);
+if (acknowledged.status !== 0) throw new Error(`main acknowledgement failed: ${acknowledged.stderr}`);
+finishPrompt();
+await fire("model_select", { model: { provider: "anthropic", id: "replacement-model" } });
+globalThis.__fmOnBranchPrompt = async ({ session }) => {
+  const tool = session.activeCustomTools.find((candidate) => candidate.name === "fm_branch_report");
+  const result = await tool.execute("recovered", { task: "branch-driver", verdict: "routine", summary: "healthy replacement" });
+  if (result.isError) throw new Error(`replacement report failed: ${JSON.stringify(result)}`);
+};
+const recovered = dispatch("signal: corrected branch selection");
+if (!recovered.accepted) throw new Error("selection change could not recover the branch");
+await recovered.settlement;
+if (globalThis.__fmSessions.length !== 2) throw new Error("replacement session was not constructed");
+if (existsSync(`${home}/state/.branch-eligible-rows`)) throw new Error("healthy replacement retained its grant");
+if (!readFileSync(`${home}/state/.wake-queue`, "utf8").includes("branch-driver.status")) throw new Error("unacknowledged row was lost");
+process.exit(0);
+EOF
+  status=$?
+  out=$(cat "$TMP_ROOT/node-output")
+  expect_code 0 "$status" "stalled branch must retire ownership before main fallback and allow replacement: $out"
+  pass "stalled branch retires ownership, rejects queued work, and permits selection recovery"
 }
 
 test_main_owned_grant_result_falls_back_to_main() {
@@ -5974,6 +6055,7 @@ test_branch_predrain_needs_decision_keeps_routine_row_branch_eligible
 test_settled_branch_prompt_releases_unacknowledged_grant
 test_post_construction_provider_error_falls_back_latches_and_recovers_on_cooldown
 test_selection_change_does_not_corrupt_inflight_provider_state
+test_stalled_branch_retires_grants_and_queued_work
 test_main_owned_grant_result_falls_back_to_main
 test_branch_predrain_recheck_noops_already_drained_wake
 test_branch_mirror_filters_order_and_cursor
