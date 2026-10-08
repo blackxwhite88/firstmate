@@ -621,6 +621,100 @@ EOF
   pass "Pi dispatcher branch offer owns accepted wakes and falls back to main"
 }
 
+test_pi_stalled_branch_turn_times_out_and_falls_back_to_main() {
+  local repo home plugin log stop out status
+  repo="$TMP_ROOT/pi-branch-timeout-root"
+  home="$TMP_ROOT/pi-branch-timeout-home"
+  log="$TMP_ROOT/pi-branch-timeout.log"
+  stop="$TMP_ROOT/pi-branch-timeout.stop"
+  mkdir -p "$repo/bin" "$home/state" "$home/config"
+  install_pi_watch_extension_fixture "$repo"
+  plugin="$repo/.pi/extensions/fm-primary-pi-watch.ts"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --handling-delivered ]; then
+  printf 'confirmed generation=%s watcher=%s\n' "$2" "$4" >> "${FM_ARM_LOG:?}"
+  exit 0
+fi
+printf 'arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+count=$(grep -c '^arm=' "$FM_ARM_LOG")
+if [ "$count" -eq 1 ]; then
+  printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+  printf 'signal: branch-timeout synthetic wake\n'
+  exit 0
+fi
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=fixture-generation\n' "$$"
+trap 'exit 0' TERM INT
+while [ ! -e "$FM_STOP_FILE" ]; do sleep 0.02; done
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  out=$(PLUGIN="$plugin" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" FM_STOP_FILE="$stop" FM_BRANCH_DELIVERY_TIMEOUT_MS=50 node --input-type=module 2>&1 <<'EOF'
+import { readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+const offers = [];
+let mainPrompt = "";
+let tool = null;
+const handlers = new Map();
+const bus = {
+  on(channel, handler) {
+    handlers.set(channel, [...(handlers.get(channel) ?? []), handler]);
+    return () => {};
+  },
+  emit(channel, data) {
+    for (const handler of handlers.get(channel) ?? []) handler(data);
+  },
+};
+bus.on("fm-branch-supervision:dispatch", (offer) => {
+  offers.push({ message: offer.message, projects: offer.projects });
+  // Simulating a stalled branch turn that never resolves
+  offer.accept(new Promise(() => {}));
+});
+const pi = {
+  on() {},
+  events: bus,
+  registerCommand() {},
+  registerTool(candidate) {
+    if (candidate.name === "fm_watch_arm_pi") tool = candidate;
+  },
+  sendUserMessage: async (message) => {
+    mainPrompt = message;
+  },
+};
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+writeFileSync(`${process.env.FM_HOME}/state/branch-timeout.meta`, "project=/projects/approved\nwindow=fm-branch-timeout\n");
+writeFileSync(`${process.env.FM_HOME}/state/.wake-queue`, "1\t1\tsignal\tbranch-timeout.status\tsignal: branch-timeout synthetic wake\n");
+const mod = await import(pathToFileURL(process.env.PLUGIN).href);
+mod.default(pi);
+await tool.execute("tool-call-branch-timeout", {}, undefined, undefined, {});
+for (let i = 0; i < 250; i += 1) {
+  if (mainPrompt !== "") break;
+  await new Promise((resolve) => setTimeout(resolve, 10));
+}
+if (offers.length !== 1) throw new Error(`expected one branch offer, got ${offers.length}`);
+if (!offers[0].message.includes("signal: branch-timeout synthetic wake")) {
+  throw new Error(`offer missed the wake reason: ${offers[0].message}`);
+}
+if (!mainPrompt.includes("FIRSTMATE WATCHER WAKE")) {
+  throw new Error(`stalled branch offer did not fall back to main: ${mainPrompt}`);
+}
+if (!mainPrompt.includes("signal: branch-timeout synthetic wake")) {
+  throw new Error(`fallback wake lost the reason line: ${mainPrompt}`);
+}
+const rows = readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n");
+if (!rows.some((row) => row.startsWith("confirmed generation=fixture-generation"))) {
+  throw new Error(`handling delivery was not confirmed before fallback: ${rows.join(" | ")}`);
+}
+writeFileSync(process.env.FM_STOP_FILE, "stop\n");
+process.exit(0);
+EOF
+  )
+  status=$?
+  expect_code 0 "$status" "Pi dispatcher must time out stalled branch turn and fall back to main"
+  [ -z "$out" ] || fail "Pi branch-timeout test printed output: $out"
+  pass "Pi dispatcher times out stalled branch turn and falls back to main"
+}
+
 test_pi_branch_offer_flags_heartbeat() {
   local repo home plugin log stop out status
   repo="$TMP_ROOT/pi-branch-heartbeat-root"
@@ -5188,6 +5282,7 @@ test_pi_scheduled_retry_call_is_owned_noop
 test_pi_actionable_close_starts_single_successor_before_delivery
 test_pi_actionable_output_waits_for_predecessor_close
 test_pi_branch_offer_owns_actionable_wake
+test_pi_stalled_branch_turn_times_out_and_falls_back_to_main
 test_pi_branch_offer_flags_heartbeat
 test_pi_heartbeat_is_not_ridden_into_main_by_a_co_present_check
 test_pi_main_only_check_classes_stay_on_main

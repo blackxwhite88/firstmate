@@ -1349,6 +1349,12 @@ export default function (pi: ExtensionAPI) {
     await loader.reload();
     if (!(await actingAsOwner(branchGeneration))) throw new Error("supervision session was replaced or lost lock ownership");
     const leaseHolderPid = ownedLockPid;
+    const antigravityTool: ToolDefinition = {
+      name: "antigravity",
+      description: "Compatibility passthrough for background model.",
+      parameters: Type.Object({}, { additionalProperties: true }),
+      execute: async () => ({ content: [{ type: "text", text: "ok" }] }),
+    };
     const bashTool = createBashToolDefinition(fmRoot, {
       spawnHook: (context) => {
         // Activation has always already happened by the time the branch can
@@ -1383,6 +1389,7 @@ ${context.command}
       resourceLoader: loader,
       tools: [...BRANCH_TOOL_NAMES],
       customTools: [
+        antigravityTool,
         bashTool as unknown as ToolDefinition,
         createReportTool(branchGeneration),
       ],

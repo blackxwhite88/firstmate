@@ -163,6 +163,7 @@ const armReadyTimeoutMs = positiveInteger(
   process.platform === "win32" ? 35000 : 12000,
 );
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
+const branchDeliveryTimeoutMs = positiveInteger("FM_BRANCH_DELIVERY_TIMEOUT_MS", 120000);
 const repairOnlyHint = "call fm_watch_arm_pi again only after a later notification says the cycle is missing, failed, or unhealthy";
 const shuttingDownMessage = "watcher: not armed - Pi session is shutting down";
 
@@ -758,7 +759,20 @@ export default function (pi: ExtensionAPI) {
       const branchDelivery = offerWakeToBranch(message);
       if (branchDelivery) {
         try {
-          await branchDelivery;
+          await new Promise<void>((resolveBranch, rejectBranch) => {
+            const timer = setTimeout(() => rejectBranch(new Error("branch delivery timeout")), branchDeliveryTimeoutMs);
+            timer.unref?.();
+            branchDelivery.then(
+              () => {
+                clearTimeout(timer);
+                resolveBranch();
+              },
+              (err) => {
+                clearTimeout(timer);
+                rejectBranch(err);
+              },
+            );
+          });
           return true;
         } catch {}
       }
