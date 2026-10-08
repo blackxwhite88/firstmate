@@ -149,13 +149,14 @@ That row is not fleet context the branch is missing, and main is woken for it on
 
 #### One conversation per main session
 
-The branch conversation lasts for exactly one main session.
+The branch conversation normally lasts for one main session; a delivery timeout retires it early.
 Every main session start - a cold start, `/new`, `/resume`, `/fork`, or a reload - opens a NEW branch conversation.
 A conversation recorded by an earlier session is never reopened as the live one.
 That keeps the branch reasoning from the current generated prompt and the current main dialog rather than from weeks of accumulated thread, where a superseded rule could still outweigh today's.
 
 A model or effort change triggers a rebuild inside one main session.
-Only such a rebuild continues that session's own conversation, and `state/.branch-session` records it.
+Such a rebuild continues that session's own conversation unless a delivery timeout retired it, and `state/.branch-session` records the live conversation.
+After a timeout, recovery creates a fresh conversation with re-anchored main dialog instead of reopening the retired one.
 
 Earlier conversations stay on disk under `state/branch-session/`, exactly as Pi keeps its own session files.
 They are never reopened as live branch context.
@@ -178,6 +179,10 @@ A broken branch declines later offers, so they take that path directly.
 
 After wake rows are claimed, a branch prompt counts as handled only when `fm_branch_report` appends a durable outcome before that prompt settles.
 A settled provider error, or a settled prompt with no report, releases the grant and rejects delivery ownership back to the watcher.
+A branch prompt that exceeds its delivery deadline also rejects settlement, retires its generation, disposes the session, and releases that generation's row grants.
+Queued wakes from the retired generation reject rather than running, and its guarded reports and shell launches are refused.
+This does not guarantee termination of an already-running shell or transport.
+The deadline defaults to 120000 milliseconds; `FM_BRANCH_DELIVERY_TIMEOUT_MS` overrides it only with a positive safe integer.
 
 #### Report scoping
 
@@ -207,6 +212,8 @@ It must append a durable `fm_branch_report` and then settle without a provider e
 That clears both the latch and the provider-error streak and surfaces a one-line recovery note.
 If a provider error settles after that report, the error wins instead: it re-latches the branch and extends the cooldown.
 A session replacement or branch model or effort change resets the recovery state immediately.
+A delivery timeout instead latches the branch broken without cooldown probes until one of those resets.
+If the selection already changed while the timed-out prompt was running, retirement does not latch the corrected selection broken.
 
 ### Branch model and effort selection
 
@@ -363,7 +370,8 @@ Mirroring happens at two points:
   The complete current captain message therefore precedes any branch wake accepted after that boundary.
   The later persisted copy is suppressed, and older dialog entries remain bounded.
 
-The mirror cursor is durable (`state/.branch-mirror-cursor`), so within one main session only not-yet-mirrored dialog is replayed.
+The mirror cursor is durable (`state/.branch-mirror-cursor`), so normally within one main session only not-yet-mirrored dialog is replayed.
+Timeout recovery also re-anchors collection for the replacement conversation, merging replayed history with pending dialog by session-file and entry identity and retaining unpersisted staged captain input.
 
 ### Re-anchoring at each main session start
 
@@ -523,6 +531,9 @@ Reuse is best-effort, never guaranteed.
 The branch can also run on a cheaper model and a shallower reasoning effort than main, both pinned with the Pi `/supervision-model` command.
 [configuration.md](configuration.md#pi-supervision-branch-model-and-effort-configsupervision-branch-model-configsupervision-branch-effort) owns those pins' operator-facing schema and unpinned behavior.
 
+The branch's fixed loadout includes an `antigravity` compatibility tool alongside `read`, guarded `bash`, and `fm_branch_report`.
+It accepts arbitrary object parameters and returns `ok` without performing an action; it is neither a shell execution tool nor an outcome report.
+
 Some providers are registered by an extension only into main's runtime, such as pi-devin-auth's `devin`.
 Such a provider reaches the isolated branch runtime by copying its provider config from main's captured `ModelRegistry` into the branch `ModelRuntime`.
 The copy happens at model-resolution time and in the `/supervision-model` picker.
@@ -647,7 +658,8 @@ At that moment the branch reports any refusal instead of concluding there is "no
 - Cold-start post-lock recovery, crash-before-cursor reload recovery, and repeated-reload idempotency.
 - Mirroring.
 - Post-construction provider-error and no-report fallback, the consecutive-error latch, cooldown probe, exponential backoff, report-plus-settlement recovery, and report-before-error re-latch.
-- Cache key, and model and effort selection.
+- Cache key, model and effort selection, and execution of the permitted no-op compatibility tool.
+- Stalled-prompt retirement, real row-grant release and main drain, queued-wake rejection, stale side-effect refusal, selection changes before and after timeout, and ordered duplicate-free dialog replay into a fresh conversation.
 - In `test_branch_dispatch_classifies_main_only_rows_and_writes_the_eligible_snapshot`: decision-owned signal and stale rows' exclusion from `eligibleSeqs`, their presence in `needsDecisionKeys`, task alias resolution, reserved-key configuration, status-log race and symlink refusal, non-vetoing behavior for unrelated eligible rows, and decision-only queues reading as ordinary main-only absence.
 - In `test_branch_dispatch_routes_secondmate_signal_by_new_span`: second-mate signal routing by new span on the Pi and attended-host paths, including an unrelated open hold, mixed, same-key, stamped-key, key-less blocked, and resolution spans, the whole-log fallback, stale-row isolation, and crewmate routing.
 

@@ -259,7 +259,8 @@ If a pin names a model Pi cannot return because it is unknown or has no configur
 It sends the accepted wake back to the watcher's captain-facing main path, as any other unreachable branch does.
 It never silently falls back to main's model.
 
-Picking also releases the live branch so the next wake reopens this session's own branch conversation under the new model without waiting for a session replacement.
+Picking also releases the live branch so the next wake rebuilds it under the new model without waiting for a session replacement.
+Normally that rebuild reopens this session's own branch conversation; after a delivery timeout it creates a fresh one, as described in [the branch lifecycle](pi-supervision-branch.md#one-conversation-per-main-session).
 
 ### Effort file format and available levels
 
