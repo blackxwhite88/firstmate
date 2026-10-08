@@ -1,0 +1,14 @@
+ok - stalled branch preserves after-timeout recovery and delivered dialog
+ok - stalled branch preserves after-timeout recovery and pending dialog
+ok - stalled branch preserves after-timeout recovery and persisted dialog
+ok - stalled branch preserves model recovery and delivered dialog
+ok - stalled branch preserves model recovery and pending dialog
+ok - stalled branch preserves model recovery and persisted dialog
+ok - stalled branch preserves effort recovery and delivered dialog
+ok - stalled branch preserves effort recovery and pending dialog
+ok - stalled branch preserves effort recovery and persisted dialog
+ok - stalled branch preserves command recovery and delivered dialog
+ok - stalled branch preserves command recovery and pending dialog
+ok - stalled branch preserves command recovery and persisted dialog
+ok - branch owns accepted wakes with a stable prefix and deterministic verdict-driven delivery
+ok - a captain outcome reaches main's model as one typed, sequence-keyed processing request while routine notes stay plain

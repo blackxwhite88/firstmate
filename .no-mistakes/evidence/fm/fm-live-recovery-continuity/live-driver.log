@@ -1,0 +1,49 @@
+/home/local/.no-mistakes/worktrees/b39db14c8322/01M4DVV8KZKGKXJKB3N6XH3F6Q/.l
+{
+  "driver": [
+    {
+      "started": 2436271
+    },
+    {
+      "accepted": true
+    },
+    {
+      "settled": "ok"
+    },
+    {
+      "accepted": true
+    },
+    {
+      "accepted": true
+    },
+    {
+      "modelChanged": true
+    },
+    {
+      "settled": "supervision branch delivery timeout"
+    },
+    {
+      "settled": "supervision session was replaced before handling the accepted wake"
+    },
+    {
+      "accepted": true
+    },
+    {
+      "settled": "ok"
+    },
+    {
+      "accepted": true
+    },
+    {
+      "settled": "ok"
+    }
+  ],
+  "grantAfterTimeout": false,
+  "requestCounts": {
+    "('compat', False)": 1,
+    "('compat', True)": 3,
+    "('stall', True)": 1,
+    "('stall', False)": 1,
+    "('recovery', True)": 4
+  }
+}

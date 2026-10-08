@@ -1,0 +1,201 @@
+Real Pi 1.1.0 CLI, private fm-lab tmux socket, 120x35 terminal.
+Provider: disposable loopback OpenAI-compatible endpoint; no real Gemini request.
+Driver events:
+[
+  {
+    "started": 2436271
+  },
+  {
+    "accepted": true
+  },
+  {
+    "settled": "ok"
+  },
+  {
+    "accepted": true
+  },
+  {
+    "accepted": true
+  },
+  {
+    "modelChanged": true
+  },
+  {
+    "settled": "supervision branch delivery timeout"
+  },
+  {
+    "settled": "supervision session was replaced before handling the accepted wake"
+  },
+  {
+    "accepted": true
+  },
+  {
+    "settled": "ok"
+  },
+  {
+    "accepted": true
+  },
+  {
+    "settled": "ok"
+  }
+]
+Grant remains after timeout: False
+
+=== Compatibility cycle ===
+
+ ▀▀█  v1.1.0
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  drive.ts, fm-branch-supervision.ts
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf
+ and restart tmux.
+
+
+ Captain baseline context ALPHA
+
+
+ PRIMARY RESPONSE: context acknowledged.
+
+ LAB wake settled
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/b39db14c8322/01M4DVV8KZKGKXJKB3N6XH3F6Q (detached)
+1.4%/128k (auto)                                                                                                   probe
+
+
+=== Timeout and corrected selection ===
+ █▀ █ escape interrupt · ctrl+c/ctrl+d clear/exit · / commands · ! bash · ctrl+o more
+ Press ctrl+o to show full startup help and loaded resources.
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  drive.ts, fm-branch-supervision.ts
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf
+ and restart tmux.
+
+
+ Captain baseline context ALPHA
+
+
+ PRIMARY RESPONSE: context acknowledged.
+
+ LAB wake settled
+
+
+ Captain request BETA while the branch is stalled
+
+
+ PRIMARY RESPONSE: context acknowledged.
+
+ Warning: LAB supervision branch delivery timeout
+
+ Warning: LAB supervision session was replaced before handling the accepted wake
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/b39db14c8322/01M4DVV8KZKGKXJKB3N6XH3F6Q (detached)
+1.4%/128k (auto)                                                                                                recovery
+
+
+=== Recovered monitoring cycle ===
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  drive.ts, fm-branch-supervision.ts
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf
+ and restart tmux.
+
+
+ Captain baseline context ALPHA
+
+
+ PRIMARY RESPONSE: context acknowledged.
+
+ LAB wake settled
+
+
+ Captain request BETA while the branch is stalled
+
+
+ PRIMARY RESPONSE: context acknowledged.
+
+ Warning: LAB supervision branch delivery timeout
+
+ Warning: LAB supervision session was replaced before handling the accepted wake
+
+ LAB wake settled
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/b39db14c8322/01M4DVV8KZKGKXJKB3N6XH3F6Q (detached)
+1.4%/128k (auto)                                                                                                recovery
+
+
+=== Successor cycle ===
+
+ Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.
+
+[Extensions]
+  drive.ts, fm-branch-supervision.ts
+
+
+ Warning: tmux extended-keys is off. Modified Enter keys may not work. Add `set -g extended-keys on` to ~/.tmux.conf
+ and restart tmux.
+
+
+ Captain baseline context ALPHA
+
+
+ PRIMARY RESPONSE: context acknowledged.
+
+ LAB wake settled
+
+
+ Captain request BETA while the branch is stalled
+
+
+ PRIMARY RESPONSE: context acknowledged.
+
+ Warning: LAB supervision branch delivery timeout
+
+ Warning: LAB supervision session was replaced before handling the accepted wake
+
+ LAB wake settled
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+~/.no-mistakes/worktrees/b39db14c8322/01M4DVV8KZKGKXJKB3N6XH3F6Q (detached)
+1.4%/128k (auto)                                                                                                recovery
+
+
+Replacement context at real provider boundary:
+[{"type": "text", "text": "[captain] Captain baseline context ALPHA"}]
+[{"type": "text", "text": "[main] PRIMARY RESPONSE: context acknowledged."}]
+[{"type": "text", "text": "[captain] Captain request BETA while the branch is stalled"}]
+[{"type": "text", "text": "[main] PRIMARY RESPONSE: context acknowledged."}]
+[{"type": "text", "text": "FIRSTMATE SUPERVISION WAKE: heartbeat\n\nHandle this per your operating procedure and finish with fm_branch_report."}]

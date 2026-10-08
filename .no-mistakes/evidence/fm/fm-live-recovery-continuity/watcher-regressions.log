@@ -1,0 +1,2 @@
+ok - Pi dispatcher falls back to main after branch failure
+ok - Pi actionable close starts one successor before wake delivery settles
