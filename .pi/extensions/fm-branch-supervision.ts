@@ -539,7 +539,8 @@ function collectMainDialog(sessionManager: ReadonlyEntries, collection: MirrorCo
   const file = sessionManager.getSessionFile() ?? "";
   const entries = sessionManager.getEntries();
   const anchor = collection.collectAnchor ?? readMirrorCursor();
-  const start = collection.reanchor || anchor.file !== file ? 0 : Math.min(anchor.index, entries.length);
+  const reanchor = collection.reanchor;
+  const start = reanchor || anchor.file !== file ? 0 : Math.min(anchor.index, entries.length);
   collection.reanchor = false;
   let currentCaptainIndex = -1;
   for (let index = entries.length - 1; index >= start; index -= 1) {
@@ -570,7 +571,7 @@ function collectMainDialog(sessionManager: ReadonlyEntries, collection: MirrorCo
       staged.text === text
     ) {
       collection.stagedCaptain = null;
-      continue;
+      if (!reanchor) continue;
     }
     items.push({
       tag: message.role === "user" ? "captain" : "main",
@@ -1578,10 +1579,6 @@ ${context.command}
             if (acceptedGeneration === generation) {
               generation += 1;
               mirrorCollection.reanchor = true;
-              const staged = mirrorCollection.stagedCaptain;
-              if (staged && !pendingMirror.some((item) => item.tag === "captain" && item.text === staged.text)) {
-                pendingMirror.push({ tag: "captain", text: staged.text });
-              }
               if (branchForWake.selectionRevision === branchSelectionRevision) {
                 branchBroken = timeoutError.message;
                 providerRecovery = null;
@@ -1654,9 +1651,19 @@ ${context.command}
     if (!currentMainSession) return true;
     try {
       const reanchor = mirrorCollection.reanchor;
+      const staged = mirrorCollection.stagedCaptain;
       const items = collectMainDialog(currentMainSession, mirrorCollection);
-      if (reanchor) pendingMirror.unshift(...items);
-      else pendingMirror.push(...items);
+      if (reanchor) {
+        if (staged) {
+          for (let index = pendingMirror.length - 1; index >= 0; index -= 1) {
+            if (pendingMirror[index].tag === "captain" && pendingMirror[index].text === staged.text) {
+              pendingMirror.splice(index, 1);
+            }
+          }
+          if (mirrorCollection.stagedCaptain) pendingMirror.push({ tag: "captain", text: staged.text });
+        }
+        pendingMirror.unshift(...items);
+      } else pendingMirror.push(...items);
       return true;
     } catch {
       return false;

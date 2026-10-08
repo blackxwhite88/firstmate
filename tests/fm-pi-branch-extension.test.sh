@@ -3049,7 +3049,7 @@ EOF
 test_stalled_branch_retires_grants_and_queued_work() {
   local repo home out status selection input
   for selection in after-timeout model effort command; do
-  for input in delivered pending; do
+  for input in delivered pending persisted; do
   repo="$TMP_ROOT/stalled-branch-$selection-$input-root"
   home="$TMP_ROOT/stalled-branch-$selection-$input-home"
   mkdir -p "$home/state" "$home/config"
@@ -3094,6 +3094,12 @@ if (process.env.FM_TEST_MIRROR_INPUT === "pending") {
 }
 const queued = dispatch("signal: queued behind stalled probe");
 const queuedFailure = queued.settlement.then(() => null, (error) => error);
+if (process.env.FM_TEST_MIRROR_INPUT === "persisted") {
+  mainEntries.push(
+    { type: "message", message: { role: "user", content: stagedText } },
+    { type: "message", message: { role: "assistant", content: "primary response persisted before turn-end collection" } },
+  );
+}
 if (!first.accepted || !queued.accepted) throw new Error("live branch did not accept wakes");
 if (!existsSync(`${home}/state/.branch-eligible-rows`)) throw new Error("stalled prompt has no real row grant");
 const drain = (...args) => spawnSync("bash", [`${realRoot}/bin/fm-wake-drain.sh`, ...args], {
@@ -3163,6 +3169,8 @@ const expectedMirror = [
 ];
 if (process.env.FM_TEST_MIRROR_INPUT === "pending") {
   expectedMirror.push("[main] primary pending response while the probe is stalled", `[captain] ${pendingText}`);
+} else if (process.env.FM_TEST_MIRROR_INPUT === "persisted") {
+  expectedMirror.push("[main] primary response persisted before turn-end collection");
 }
 const replacementMirror = mirrorTexts(replacement);
 let previousIndex = -1;
@@ -3170,6 +3178,9 @@ for (const text of expectedMirror) {
   const index = replacementMirror.indexOf(text);
   if (index <= previousIndex) throw new Error(`replacement branch lost or reordered context: ${text}`);
   previousIndex = index;
+}
+if (replacementMirror.filter((text) => text === `[captain] ${stagedText}`).length !== 1) {
+  throw new Error("replacement duplicated the staged captain input");
 }
 if (selection !== "effort" && replacement.options.model?.id !== "replacement-model") {
   throw new Error("replacement did not use the corrected model");
