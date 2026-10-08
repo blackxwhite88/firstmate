@@ -201,7 +201,7 @@ const PROCESSING_INSTRUCTION =
   "Write that reply as if the settled outcomes had never been listed: leave them out entirely, without naming them, summarizing them, or saying they are settled, because checking them is all the processing they need. " +
   "When every outcome below is processed, call fm_branch_processed with through={N} exactly once. " +
   "Until that call the outcomes stay open and are presented again; an answer that does not make that call never counts as processing.";
-type MirrorItem = { tag: "captain" | "main"; text: string };
+type MirrorItem = { file: string; index: number; tag: "captain" | "main"; text: string };
 type MirrorCursor = { file: string; index: number };
 type Verdict = "routine" | "captain";
 type LockOwnership = "owned" | "other" | "missing";
@@ -574,6 +574,8 @@ function collectMainDialog(sessionManager: ReadonlyEntries, collection: MirrorCo
       if (!reanchor) continue;
     }
     items.push({
+      file,
+      index,
       tag: message.role === "user" ? "captain" : "main",
       text: index === currentCaptainIndex ? text : capMirrorText(text),
     });
@@ -1651,16 +1653,17 @@ ${context.command}
     if (!currentMainSession) return true;
     try {
       const reanchor = mirrorCollection.reanchor;
-      const staged = mirrorCollection.stagedCaptain;
       const items = collectMainDialog(currentMainSession, mirrorCollection);
       if (reanchor) {
-        if (staged) {
-          for (let index = pendingMirror.length - 1; index >= 0; index -= 1) {
-            if (pendingMirror[index].tag === "captain" && pendingMirror[index].text === staged.text) {
-              pendingMirror.splice(index, 1);
-            }
-          }
-          if (mirrorCollection.stagedCaptain) pendingMirror.push({ tag: "captain", text: staged.text });
+        const file = currentMainSession.getSessionFile() ?? "";
+        const replayedIndices = new Set(items.map((item) => item.index));
+        for (let index = pendingMirror.length - 1; index >= 0; index -= 1) {
+          const pending = pendingMirror[index];
+          if (pending.file === file && replayedIndices.has(pending.index)) pendingMirror.splice(index, 1);
+        }
+        const staged = mirrorCollection.stagedCaptain;
+        if (staged && !pendingMirror.some((item) => item.file === staged.file && item.index === staged.index)) {
+          pendingMirror.push({ ...staged, tag: "captain" });
         }
         pendingMirror.unshift(...items);
       } else pendingMirror.push(...items);
@@ -1737,7 +1740,7 @@ ${context.command}
     if (!trimmed || isOperationalUserText(trimmed)) return;
     const file = currentMainSession.getSessionFile() ?? "";
     const index = mirrorCollection.collectAnchor?.index ?? currentMainSession.getEntries().length;
-    pendingMirror.push({ tag: "captain", text: trimmed });
+    pendingMirror.push({ file, index, tag: "captain", text: trimmed });
     mirrorCollection.stagedCaptain = { file, index, text: trimmed };
   });
 

@@ -3091,6 +3091,18 @@ if (process.env.FM_TEST_MIRROR_INPUT === "pending") {
   );
   await fire("turn_end", {}, defaultSessionCtx);
   await fire("before_agent_start", { prompt: pendingText }, defaultSessionCtx);
+  mainEntries.push(
+    { type: "message", message: { role: "user", content: pendingText } },
+    { type: "message", message: { role: "assistant", content: "primary pending response while the probe is stalled" } },
+  );
+  await fire("turn_end", {}, defaultSessionCtx);
+  await fire("before_agent_start", { prompt: stagedText }, defaultSessionCtx);
+  mainEntries.push(
+    { type: "message", message: { role: "user", content: stagedText } },
+    { type: "message", message: { role: "assistant", content: "primary pending response while the probe is stalled" } },
+  );
+  await fire("turn_end", {}, defaultSessionCtx);
+  await fire("before_agent_start", { prompt: pendingText }, defaultSessionCtx);
 }
 const queued = dispatch("signal: queued behind stalled probe");
 const queuedFailure = queued.settlement.then(() => null, (error) => error);
@@ -3168,19 +3180,20 @@ const expectedMirror = [
   `[captain] ${stagedText}`,
 ];
 if (process.env.FM_TEST_MIRROR_INPUT === "pending") {
-  expectedMirror.push("[main] primary pending response while the probe is stalled", `[captain] ${pendingText}`);
+  expectedMirror.push(
+    "[main] primary pending response while the probe is stalled",
+    `[captain] ${pendingText}`,
+    "[main] primary pending response while the probe is stalled",
+    `[captain] ${stagedText}`,
+    "[main] primary pending response while the probe is stalled",
+    `[captain] ${pendingText}`,
+  );
 } else if (process.env.FM_TEST_MIRROR_INPUT === "persisted") {
   expectedMirror.push("[main] primary response persisted before turn-end collection");
 }
 const replacementMirror = mirrorTexts(replacement);
-let previousIndex = -1;
-for (const text of expectedMirror) {
-  const index = replacementMirror.indexOf(text);
-  if (index <= previousIndex) throw new Error(`replacement branch lost or reordered context: ${text}`);
-  previousIndex = index;
-}
-if (replacementMirror.filter((text) => text === `[captain] ${stagedText}`).length !== 1) {
-  throw new Error("replacement duplicated the staged captain input");
+if (JSON.stringify(replacementMirror) !== JSON.stringify(expectedMirror)) {
+  throw new Error(`replacement branch lost, duplicated, or reordered dialog: ${JSON.stringify(replacementMirror)}`);
 }
 if (selection !== "effort" && replacement.options.model?.id !== "replacement-model") {
   throw new Error("replacement did not use the corrected model");
