@@ -3047,18 +3047,24 @@ EOF
 }
 
 test_stalled_branch_retires_grants_and_queued_work() {
-  local repo home out status
-  repo="$TMP_ROOT/stalled-branch-root"
-  home="$TMP_ROOT/stalled-branch-home"
+  local repo home out status selection
+  for selection in after-timeout model effort command; do
+  repo="$TMP_ROOT/stalled-branch-$selection-root"
+  home="$TMP_ROOT/stalled-branch-$selection-home"
   mkdir -p "$home/state" "$home/config"
   install_pi_branch_extension_fixture "$repo"
   PLUGIN="$repo/.pi/extensions/fm-branch-supervision.ts" FM_HOME="$home" FM_ROOT_OVERRIDE="$ROOT" \
-    FM_BRANCH_DELIVERY_TIMEOUT_MS=5000 DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
+    FM_TEST_SELECTION_TIMING="$selection" FM_BRANCH_DELIVERY_TIMEOUT_MS=5000 DRIVER_PRELUDE="$DRIVER_PRELUDE" node --input-type=module > "$TMP_ROOT/node-output" 2>&1 <<'EOF'
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 const prelude = process.env.DRIVER_PRELUDE;
-await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, settle, home, realRoot, defaultSessionCtx }; })()`);
-const { dispatch, fire, settle, home, realRoot, defaultSessionCtx } = globalThis.__t;
+await eval(`(async () => { ${prelude}; globalThis.__t = { dispatch, fire, settle, home, realRoot, defaultSessionCtx, makeCtx, commands, registryModels, uiSelections, setMainThinkingLevel }; })()`);
+const { dispatch, fire, settle, home, realRoot, defaultSessionCtx, makeCtx, commands, registryModels, uiSelections, setMainThinkingLevel } = globalThis.__t;
+const selection = process.env.FM_TEST_SELECTION_TIMING;
+registryModels.push(
+  { provider: "anthropic", id: "main-model", reasoning: true },
+  { provider: "anthropic", id: "replacement-model", reasoning: true },
+);
 await fire("session_start", {}, defaultSessionCtx);
 let finishPrompt;
 globalThis.__fmOnBranchPrompt = () => new Promise((resolve) => { finishPrompt = resolve; });
@@ -3077,13 +3083,27 @@ const blocked = drain();
 if (blocked.status !== 0 || blocked.stdout.includes("branch-driver.status")) {
   throw new Error(`main must not drain a live branch grant: ${blocked.stderr} ${blocked.stdout}`);
 }
+if (selection === "model") {
+  await fire("model_select", { model: { provider: "anthropic", id: "replacement-model" } });
+} else if (selection === "effort") {
+  setMainThinkingLevel("high");
+  await fire("thinking_level_select", { level: "high" });
+} else if (selection === "command") {
+  uiSelections.push("anthropic/replacement-model", "high");
+  await commands.get("supervision-model").handler("", makeCtx());
+  if (readFileSync(`${home}/config/supervision-branch-model`, "utf8") !== "anthropic/replacement-model\n") {
+    throw new Error("model command did not persist its corrected selection");
+  }
+}
 const error = await firstFailure;
 if (!error?.message.includes("delivery timeout")) throw new Error(`stalled prompt did not reject: ${error}`);
 if (!staleSession.disposed) throw new Error("stalled session was not disposed");
 if (existsSync(`${home}/state/.branch-eligible-rows`)) throw new Error("stalled prompt retained row ownership");
 if (!(await queuedFailure)?.message.includes("replaced")) throw new Error("queued work remained stuck or ran after retirement");
-const declined = dispatch("signal: after stalled probe");
-if (declined.accepted) throw new Error("later offer joined the retired branch");
+if (selection === "after-timeout") {
+  const declined = dispatch("signal: after stalled probe");
+  if (declined.accepted) throw new Error("later offer joined the retired branch");
+}
 const resumed = drain();
 if (resumed.status !== 0 || !resumed.stdout.includes("branch-driver.status")) {
   throw new Error(`main could not drain released row: ${resumed.stderr} ${resumed.stdout}`);
@@ -3100,7 +3120,9 @@ if (!recoveryGeneration) throw new Error(`main drain omitted its acknowledgement
 const acknowledged = drain("--ack-through", "1", "--recovery-generation", recoveryGeneration);
 if (acknowledged.status !== 0) throw new Error(`main acknowledgement failed: ${acknowledged.stderr}`);
 finishPrompt();
-await fire("model_select", { model: { provider: "anthropic", id: "replacement-model" } });
+if (selection === "after-timeout") {
+  await fire("model_select", { model: { provider: "anthropic", id: "replacement-model" } });
+}
 globalThis.__fmOnBranchPrompt = async ({ session }) => {
   const tool = session.activeCustomTools.find((candidate) => candidate.name === "fm_branch_report");
   const result = await tool.execute("recovered", { task: "branch-driver", verdict: "routine", summary: "healthy replacement" });
@@ -3110,14 +3132,22 @@ const recovered = dispatch("signal: corrected branch selection");
 if (!recovered.accepted) throw new Error("selection change could not recover the branch");
 await recovered.settlement;
 if (globalThis.__fmSessions.length !== 2) throw new Error("replacement session was not constructed");
+const replacement = globalThis.__fmSessions[1];
+if (selection !== "effort" && replacement.options.model?.id !== "replacement-model") {
+  throw new Error("replacement did not use the corrected model");
+}
+if ((selection === "effort" || selection === "command") && replacement.options.thinkingLevel !== "high") {
+  throw new Error("replacement did not use the corrected effort");
+}
 if (existsSync(`${home}/state/.branch-eligible-rows`)) throw new Error("healthy replacement retained its grant");
 if (!readFileSync(`${home}/state/.wake-queue`, "utf8").includes("branch-driver.status")) throw new Error("unacknowledged row was lost");
 process.exit(0);
 EOF
   status=$?
   out=$(cat "$TMP_ROOT/node-output")
-  expect_code 0 "$status" "stalled branch must retire ownership before main fallback and allow replacement: $out"
-  pass "stalled branch retires ownership, rejects queued work, and permits selection recovery"
+  expect_code 0 "$status" "stalled branch must retire ownership and preserve $selection recovery: $out"
+  pass "stalled branch retires ownership and preserves $selection recovery"
+  done
 }
 
 test_main_owned_grant_result_falls_back_to_main() {

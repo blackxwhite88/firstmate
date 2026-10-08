@@ -1577,8 +1577,10 @@ ${context.command}
           if (error === timeoutError) {
             if (acceptedGeneration === generation) {
               generation += 1;
-              branchBroken = timeoutError.message;
-              providerRecovery = null;
+              if (branchForWake.selectionRevision === branchSelectionRevision) {
+                branchBroken = timeoutError.message;
+                providerRecovery = null;
+              }
             }
             if (branch === branchForWake) branch = null;
             try {
