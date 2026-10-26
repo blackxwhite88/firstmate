@@ -1,0 +1,6 @@
+ok - agy typed send: no not-submitted refusal on confirmed idle-to-busy
+ok - agy typed send: sleep log shows the confirm poll running to the late busy render
+ok - agy typed send: explicit FM_SEND_RETRIES=3 keeps the exit-1 verdict=unknown refusal
+ok - agy typed send: never-rendering busy footer still refuses with verdict=unknown
+ok - agy typed send: long-brief render (15th poll) still confirms idle-to-busy
+ok - claude typed send: late busy footer still refuses (agy budget is agy-scoped)
