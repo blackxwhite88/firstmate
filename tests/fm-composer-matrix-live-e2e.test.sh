@@ -23,6 +23,7 @@
 #
 # FM_COMPOSER_MATRIX_LIVE_HARNESSES="agy" narrows the harness list; optional
 # Claude-named and zellij checks run only in the default, unfiltered pass.
+# FM_COMPOSER_MATRIX_CWD="/tmp" overrides launch cwd for pre-trusted paths.
 # Run explicitly with FM_COMPOSER_MATRIX_LIVE=1. No prompt is ever submitted
 # to any harness, so no model tokens are spent. An absent harness is reported
 # explicitly and skipped; a run that verified nothing fails rather than
@@ -82,9 +83,10 @@ harness_version() {  # <binary>
 
 check_harness_idle_empty() {  # <name> <launch-cmd...>
   local name=$1 win="hx-$1" verdict='' i=0 budget=${FM_COMPOSER_MATRIX_LIVE_POLLS:-45} version dismissed=0 startup_screen
+  local launch_cwd="${FM_COMPOSER_MATRIX_CWD:-$ROOT}"
   shift
   version=$(harness_version "$1")
-  tmux -L "$SOCKET" new-window -d -t "$SESSION:" -n "$win" -c "$ROOT" -- "$@" \
+  tmux -L "$SOCKET" new-window -d -t "$SESSION:" -n "$win" -c "$launch_cwd" -- "$@" \
     || fail "$name ($version): could not launch in the isolated tmux server"
   while [ "$i" -lt "$budget" ]; do
     verdict=$(fm_tmux_composer_state "$SESSION:$win")
