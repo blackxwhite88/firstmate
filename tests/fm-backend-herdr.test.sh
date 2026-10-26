@@ -4881,6 +4881,41 @@ test_send_text_submit_idle_baseline_does_not_confirm_failed_enter() {
   pass "fm_backend_herdr_send_text_submit: a failed Enter cannot borrow a later native transition as delivery proof"
 }
 
+test_agy_empty_composer_cannot_confirm_a_missed_literal() (
+  local scripted_baseline scripted_native out expected
+  # shellcheck source=bin/backends/herdr.sh
+  . "$ROOT/bin/backends/herdr.sh"
+  # shellcheck disable=SC2329 # Mocks drive the public submit entry point.
+  fm_backend_herdr_parse_target() { FM_BACKEND_HERDR_SESSION=default; FM_BACKEND_HERDR_PANE=w1:p2; }
+  # shellcheck disable=SC2329
+  fm_backend_herdr_agent_identity_raw() { printf 'agy\tidle'; }
+  # shellcheck disable=SC2329
+  fm_backend_herdr_send_literal() { return 0; }
+  # shellcheck disable=SC2329
+  fm_backend_herdr_send_key() { return 0; }
+  # shellcheck disable=SC2329
+  fm_backend_herdr_agent_status_raw() { printf '%s' "$scripted_baseline"; }
+  # shellcheck disable=SC2329
+  fm_backend_herdr_wait_for_working() { printf '%s' "$scripted_native"; }
+  # shellcheck disable=SC2329
+  fm_backend_herdr_composer_state() { printf empty; }
+  # shellcheck disable=SC2329
+  fm_backend_herdr_rendered_busy_state() { printf idle; }
+  # shellcheck disable=SC2329
+  fm_composer_blocking_dialog_noted() { return 1; }
+  # shellcheck disable=SC2329
+  sleep() { :; }
+  for scripted_baseline in idle blocked; do
+    scripted_native=idle
+    out=$(fm_backend_herdr_send_text_submit default:w1:p2 'unsent payload' 1 0.01 0.01)
+    [ "$out" = unknown ] || fail "agy $scripted_baseline empty composer cannot confirm a missed literal, got $out"
+  done
+  scripted_baseline=idle; scripted_native=busy; expected=empty
+  out=$(fm_backend_herdr_send_text_submit default:w1:p2 'real payload' 1 0.01 0.01)
+  [ "$out" = "$expected" ] || fail "agy native transition must still confirm delivery, got $out"
+  pass "fm_backend_herdr_send_text_submit: agy empty alone cannot confirm a missed literal; native transition can"
+)
+
 test_send_text_submit_idle_native_empty_composer_confirms_delivery() {
   local dir log resp fb out enter_count
   dir="$TMP_ROOT/submit-idle-native-empty-composer"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
@@ -6350,6 +6385,7 @@ test_send_text_submit_confirms_blocked_after_enter
 test_send_text_submit_preexisting_working_pending_is_queued_enter
 test_send_text_submit_preexisting_working_does_not_confirm_failed_enter
 test_send_text_submit_idle_baseline_does_not_confirm_failed_enter
+test_agy_empty_composer_cannot_confirm_a_missed_literal || exit 1
 test_send_text_submit_idle_native_empty_composer_confirms_delivery
 test_send_text_submit_idle_native_pending_plus_rendered_busy_is_queued
 test_composer_state_cursor_midturn_row_reads_pending
