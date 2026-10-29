@@ -891,7 +891,7 @@ ok - live composer-matrix guard verified 3 live surface(s)
 ```
 
 `tests/fm-composer-ghost.test.sh` separately verifies the late-footer settle window, no delay for pending text, and fresh identity/frame reads after the wait.
-`tests/fm-backend-herdr.test.sh` verifies that an empty agy composer alone cannot acknowledge a missed literal send, while a native busy transition still confirms it.
+`tests/fm-backend-herdr.test.sh` verifies that an empty agy composer alone cannot acknowledge a missed literal send, while a native or rendered busy transition across the retry budget still confirms it without resending Enter.
 Other real harnesses and Herdr lifecycle operations were not live-reverified in this targeted refresh.
 
 ### 2026-10-14 opencode 1.19.0 de-emphasised mode/footer row in the left-bar composer
