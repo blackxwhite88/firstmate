@@ -3541,7 +3541,7 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
   # unproven type-then-Enter path.
   identity=$(fm_backend_herdr_agent_identity_raw "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE") || identity=
   [ "${identity%%$'\t'*}" != polytoken ] || busy_harness=polytoken
-  [ "${identity%%$'\t'*}" != agy ] || empty_confirmation=unknown
+  [ "${identity%%$'\t'*}" != agy ] || { empty_confirmation=unknown; busy_harness=agy; }
   if [ "${identity%%$'\t'*}" = claude ]; then
     proof=1
     content=$(fm_backend_herdr_composer_content "$target") \
@@ -3599,7 +3599,37 @@ fm_backend_herdr_send_text_submit() {  # <target> <text> <retries> <enter-sleep>
         return 0
       fi
       case "$verdict" in
-        empty) printf '%s' "$empty_confirmation"; return 0 ;;
+        empty)
+          if [ "$empty_confirmation" = empty ]; then
+            printf 'empty'
+            return 0
+          fi
+          # For a harness where empty alone does not confirm delivery (agy),
+          # an empty composer means the payload cleared. Keep polling for
+          # native or rendered busy proof for the rest of the retry budget,
+          # without sending Enter into an empty composer again.
+          if [ "$(fm_backend_herdr_rendered_busy_state "$target" "$busy_harness")" = busy ]; then
+            printf 'empty'
+            return 0
+          fi
+          while :; do
+            i=$((i + 1))
+            if [ "$i" -ge "$retries" ]; then
+              printf '%s' "$empty_confirmation"
+              return 0
+            fi
+            verdict=$(fm_backend_herdr_wait_for_working "$FM_BACKEND_HERDR_SESSION" "$FM_BACKEND_HERDR_PANE" \
+              "$confirm_sleep" "$FM_BACKEND_HERDR_SUBMIT_POLLS")
+            case "$verdict" in
+              busy) printf 'empty'; return 0 ;;
+              unknown) printf 'unknown'; return 0 ;;
+            esac
+            if [ "$(fm_backend_herdr_rendered_busy_state "$target" "$busy_harness")" = busy ]; then
+              printf 'empty'
+              return 0
+            fi
+          done
+          ;;
         pending|pending-unproven) ;;
         *) printf '%s' "$verdict"; return 0 ;;
       esac
