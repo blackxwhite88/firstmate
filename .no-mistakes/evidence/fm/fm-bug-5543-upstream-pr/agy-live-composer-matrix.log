@@ -1,0 +1,7 @@
+ok - agy (1.4.10): real idle composer classifies empty
+ok - agy (1.4.10): the same idle pane read cursorless is not pending (verdict: empty)
+ok - agy (1.4.10): real unsent draft remains pending on tmux and cursorless profiles
+# harness absent or not selected, not verified here: claude-named
+ok - strict posture live: a blank shell row classifies unknown and injection defers
+# harness absent or not selected, not verified here: zellij (false-positive regression not exercised)
+ok - live composer-matrix guard verified 3 live surface(s)
